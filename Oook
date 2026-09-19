@@ -1,0 +1,462 @@
+
+--// LOW SERVER FINDER | MOBILE UI
+--// Compact Gaming UI + Minimize + Touch Drag
+--// ใช้ใน Roblox environment ที่รองรับ request และ TeleportService
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local UserInputService = game:GetService("UserInputService")
+local MarketplaceService = game:GetService("MarketplaceService")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+--// HTTP REQUEST
+local requestFunc =
+    (syn and syn.request)
+    or (http and http.request)
+    or http_request
+    or (fluxus and fluxus.request)
+    or request
+
+if not requestFunc then
+    warn("ไม่พบ HTTP Request ที่รองรับ")
+    return
+end
+
+--// CONFIG
+local ACCENT = Color3.fromRGB(65, 145, 255)
+local BG = Color3.fromRGB(17, 20, 28)
+local PANEL = Color3.fromRGB(25, 29, 40)
+local CARD = Color3.fromRGB(32, 37, 50)
+local WHITE = Color3.fromRGB(240, 244, 255)
+local MUTED = Color3.fromRGB(145, 155, 175)
+
+local gameName = "Low Server Finder"
+
+pcall(function()
+    local info = MarketplaceService:GetProductInfo(game.PlaceId)
+    gameName = info.Name or gameName
+end)
+
+--// CLEAN OLD UI
+pcall(function()
+    local old = PlayerGui:FindFirstChild("LowServerFinder")
+    if old then old:Destroy() end
+end)
+
+--// GUI
+local Gui = Instance.new("ScreenGui")
+Gui.Name = "LowServerFinder"
+Gui.ResetOnSpawn = false
+Gui.IgnoreGuiInset = false
+Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+Gui.Parent = PlayerGui
+
+local Scale = Instance.new("UIScale")
+Scale.Parent = Gui
+
+local function updateScale()
+    local camera = workspace.CurrentCamera
+    if not camera then return end
+
+    local viewport = camera.ViewportSize
+    Scale.Scale = math.clamp(
+        math.min(viewport.X / 420, viewport.Y / 520),
+        0.68,
+        1
+    )
+end
+
+updateScale()
+
+if workspace.CurrentCamera then
+    workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateScale)
+end
+
+--// MAIN WINDOW
+local Main = Instance.new("Frame")
+Main.Name = "Main"
+Main.Size = UDim2.fromOffset(350, 390)
+Main.Position = UDim2.new(0.5, -175, 0.5, -195)
+Main.BackgroundColor3 = BG
+Main.BorderSizePixel = 0
+Main.ClipsDescendants = true
+Main.Parent = Gui
+
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 14)
+
+local Stroke = Instance.new("UIStroke")
+Stroke.Color = ACCENT
+Stroke.Transparency = 0.35
+Stroke.Thickness = 1.4
+Stroke.Parent = Main
+
+--// HEADER
+local Header = Instance.new("Frame")
+Header.Size = UDim2.new(1, 0, 0, 54)
+Header.BackgroundColor3 = PANEL
+Header.BorderSizePixel = 0
+Header.Parent = Main
+
+local HeaderCorner = Instance.new("UICorner")
+HeaderCorner.CornerRadius = UDim.new(0, 14)
+HeaderCorner.Parent = Header
+
+local HeaderCover = Instance.new("Frame")
+HeaderCover.Size = UDim2.new(1, 0, 0, 14)
+HeaderCover.Position = UDim2.new(0, 0, 1, -14)
+HeaderCover.BackgroundColor3 = PANEL
+HeaderCover.BorderSizePixel = 0
+HeaderCover.Parent = Header
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -115, 0, 24)
+Title.Position = UDim2.fromOffset(14, 7)
+Title.BackgroundTransparency = 1
+Title.Font = Enum.Font.GothamBold
+Title.Text = "LOW SERVER FINDER"
+Title.TextSize = 14
+Title.TextColor3 = WHITE
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = Header
+
+local Subtitle = Instance.new("TextLabel")
+Subtitle.Size = UDim2.new(1, -115, 0, 18)
+Subtitle.Position = UDim2.fromOffset(14, 29)
+Subtitle.BackgroundTransparency = 1
+Subtitle.Font = Enum.Font.Gotham
+Subtitle.Text = "ค้นหาเซิร์ฟเวอร์ผู้เล่นน้อย"
+Subtitle.TextSize = 10
+Subtitle.TextColor3 = MUTED
+Subtitle.TextXAlignment = Enum.TextXAlignment.Left
+Subtitle.Parent = Header
+
+--// BUTTON HELPER
+local function makeButton(parent, text, size, pos, color)
+    local b = Instance.new("TextButton")
+    b.Size = size
+    b.Position = pos
+    b.BackgroundColor3 = color
+    b.BorderSizePixel = 0
+    b.Text = text
+    b.TextColor3 = WHITE
+    b.TextSize = 15
+    b.Font = Enum.Font.GothamBold
+    b.AutoButtonColor = true
+    b.Parent = parent
+
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
+    return b
+end
+
+local Minimize = makeButton(
+    Header, "—",
+    UDim2.fromOffset(34, 32),
+    UDim2.new(1, -78, 0, 11),
+    CARD
+)
+
+local Close = makeButton(
+    Header, "×",
+    UDim2.fromOffset(34, 32),
+    UDim2.new(1, -40, 0, 11),
+    Color3.fromRGB(180, 55, 65)
+)
+
+--// SEARCH STATUS
+local Status = Instance.new("TextLabel")
+Status.Size = UDim2.new(1, -24, 0, 26)
+Status.Position = UDim2.fromOffset(12, 62)
+Status.BackgroundColor3 = PANEL
+Status.Font = Enum.Font.Gotham
+Status.Text = "พร้อมค้นหาเซิร์ฟเวอร์"
+Status.TextColor3 = MUTED
+Status.TextSize = 11
+Status.Parent = Main
+
+Instance.new("UICorner", Status).CornerRadius = UDim.new(0, 7)
+
+--// REFRESH BUTTON
+local Refresh = makeButton(
+    Main, "↻  ค้นหาเซิร์ฟเวอร์",
+    UDim2.new(1, -24, 0, 36),
+    UDim2.fromOffset(12, 96),
+    ACCENT
+)
+
+Refresh.TextSize = 12
+
+--// SERVER LIST
+local List = Instance.new("ScrollingFrame")
+List.Name = "ServerList"
+List.Position = UDim2.fromOffset(12, 140)
+List.Size = UDim2.new(1, -24, 1, -152)
+List.BackgroundColor3 = PANEL
+List.BorderSizePixel = 0
+List.ScrollBarThickness = 3
+List.ScrollBarImageColor3 = ACCENT
+List.CanvasSize = UDim2.new()
+List.AutomaticCanvasSize = Enum.AutomaticSize.Y
+List.ScrollingDirection = Enum.ScrollingDirection.Y
+List.Parent = Main
+
+Instance.new("UICorner", List).CornerRadius = UDim.new(0, 10)
+
+local Padding = Instance.new("UIPadding")
+Padding.PaddingTop = UDim.new(0, 8)
+Padding.PaddingBottom = UDim.new(0, 8)
+Padding.PaddingLeft = UDim.new(0, 8)
+Padding.PaddingRight = UDim.new(0, 8)
+Padding.Parent = List
+
+local Layout = Instance.new("UIListLayout")
+Layout.Padding = UDim.new(0, 7)
+Layout.SortOrder = Enum.SortOrder.LayoutOrder
+Layout.Parent = List
+
+--// SMALL FLOATING BUTTON
+local Floating = makeButton(
+    Gui, "LS",
+    UDim2.fromOffset(48, 48),
+    UDim2.new(0, 12, 0.5, -24),
+    ACCENT
+)
+
+Floating.Name = "FloatingButton"
+Floating.TextSize = 14
+Floating.Visible = false
+Floating.ZIndex = 10
+
+--// TOUCH / MOUSE DRAG
+local function makeDraggable(object, handle)
+    local dragging = false
+    local dragStart
+    local startPosition
+    local activeInput
+
+    handle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+
+            dragging = true
+            dragStart = input.Position
+            startPosition = object.Position
+            activeInput = input
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if not dragging then return end
+
+        if input == activeInput
+            or input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch then
+
+            local delta = input.Position - dragStart
+
+            object.Position = UDim2.new(
+                startPosition.X.Scale,
+                startPosition.X.Offset + delta.X,
+                startPosition.Y.Scale,
+                startPosition.Y.Offset + delta.Y
+            )
+        end
+    end)
+end
+
+makeDraggable(Main, Header)
+makeDraggable(Floating, Floating)
+
+--// MINIMIZE / RESTORE
+local minimized = false
+
+local function setMinimized(state)
+    minimized = state
+    Main.Visible = not state
+    Floating.Visible = state
+end
+
+Minimize.MouseButton1Click:Connect(function()
+    setMinimized(true)
+end)
+
+Floating.MouseButton1Click:Connect(function()
+    setMinimized(false)
+end)
+
+Close.MouseButton1Click:Connect(function()
+    Gui:Destroy()
+end)
+
+--// SERVER CARD
+local function createServerEntry(serverData)
+    local card = Instance.new("Frame")
+    card.Name = "ServerCard"
+    card.Size = UDim2.new(1, -2, 0, 64)
+    card.BackgroundColor3 = CARD
+    card.BorderSizePixel = 0
+    card.Parent = List
+
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 9)
+
+    local outline = Instance.new("UIStroke")
+    outline.Color = ACCENT
+    outline.Transparency = 0.85
+    outline.Parent = card
+
+    local count = Instance.new("TextLabel")
+    count.Position = UDim2.fromOffset(10, 8)
+    count.Size = UDim2.new(1, -100, 0, 22)
+    count.BackgroundTransparency = 1
+    count.Font = Enum.Font.GothamBold
+    count.Text = string.format(
+        "ผู้เล่น  %d / %d",
+        serverData.playing or 0,
+        serverData.maxPlayers or 0
+    )
+    count.TextSize = 12
+    count.TextColor3 = WHITE
+    count.TextXAlignment = Enum.TextXAlignment.Left
+    count.Parent = card
+
+    local idLabel = Instance.new("TextLabel")
+    idLabel.Position = UDim2.fromOffset(10, 32)
+    idLabel.Size = UDim2.new(1, -100, 0, 18)
+    idLabel.BackgroundTransparency = 1
+    idLabel.Font = Enum.Font.Gotham
+    idLabel.Text = "ID: " .. tostring(serverData.id)
+    idLabel.TextSize = 9
+    idLabel.TextColor3 = MUTED
+    idLabel.TextXAlignment = Enum.TextXAlignment.Left
+    idLabel.TextTruncate = Enum.TextTruncate.AtEnd
+    idLabel.Parent = card
+
+    local join = makeButton(
+        card, "JOIN",
+        UDim2.fromOffset(70, 34),
+        UDim2.new(1, -80, 0.5, -17),
+        ACCENT
+    )
+    join.TextSize = 11
+
+    join.MouseButton1Click:Connect(function()
+        Status.Text = "กำลังเชื่อมต่อเซิร์ฟเวอร์..."
+
+        local ok, err = pcall(function()
+            TeleportService:TeleportToPlaceInstance(
+                game.PlaceId,
+                serverData.id,
+                LocalPlayer
+            )
+        end)
+
+        if not ok then
+            Status.Text = "ไม่สามารถเข้าร่วมได้"
+            warn(err)
+        end
+    end)
+end
+
+--// FETCH SERVERS
+local searching = false
+
+local function fetchServers()
+    if searching then return end
+    searching = true
+    Refresh.Text = "กำลังค้นหา..."
+    Status.Text = "กำลังโหลดรายการเซิร์ฟเวอร์"
+
+    for _, child in ipairs(List:GetChildren()) do
+        if child:IsA("Frame") then
+            child:Destroy()
+        end
+    end
+
+    task.spawn(function()
+        local servers = {}
+        local cursor = nil
+        local pages = 0
+        local failed = false
+
+        repeat
+            pages += 1
+
+            local url = string.format(
+                "https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100",
+                game.PlaceId
+            )
+
+            if cursor then
+                url = url .. "&cursor=" .. HttpService:UrlEncode(cursor)
+            end
+
+            local ok, response = pcall(function()
+                return requestFunc({
+                    Url = url,
+                    Method = "GET"
+                })
+            end)
+
+            if not ok or not response or response.StatusCode ~= 200 then
+                failed = true
+                break
+            end
+
+            local decodedOk, data = pcall(function()
+                return HttpService:JSONDecode(response.Body)
+            end)
+
+            if not decodedOk or type(data) ~= "table" then
+                failed = true
+                break
+            end
+
+            for _, server in ipairs(data.data or {}) do
+                if server.playing < server.maxPlayers then
+                    table.insert(servers, server)
+                end
+            end
+
+            cursor = data.nextPageCursor
+
+        until not cursor or pages >= 5
+
+        table.sort(servers, function(a, b)
+            return a.playing < b.playing
+        end)
+
+        if failed then
+            Status.Text = "โหลดไม่สำเร็จ • ลองใหม่อีกครั้ง"
+        else
+            Status.Text = string.format(
+                "พบ %d เซิร์ฟเวอร์ • เรียงจากคนน้อย",
+                #servers
+            )
+        end
+
+        for _, server in ipairs(servers) do
+            createServerEntry(server)
+        end
+
+        if #servers == 0 and not failed then
+            Status.Text = "ไม่พบเซิร์ฟเวอร์ที่ว่าง"
+        end
+
+        Refresh.Text = "↻  ค้นหาเซิร์ฟเวอร์"
+        searching = false
+    end)
+end
+
+Refresh.MouseButton1Click:Connect(fetchServers)
+
+--// INITIAL SEARCH
+fetchServers()
